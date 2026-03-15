@@ -1,13 +1,16 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import IssueFeed from '@/components/IssueFeed';
+import ReportFAB from '@/components/ReportFAB';
 
 const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <main className="container py-6 pb-24">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tighter text-foreground">Fix your street.</h1>
+        <p className="text-muted-foreground text-base leading-relaxed">Track the progress.</p>
       </div>
-    </div>
+      <IssueFeed />
+      <ReportFAB />
+    </main>
   );
 };
 
