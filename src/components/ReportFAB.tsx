@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Camera, MapPin, Loader2, Check } from 'lucide-react';
+import { Plus, X, Camera, MapPin, Loader2, Check, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useIssues } from '@/context/IssueContext';
 import { ISSUE_TYPES, IssueType } from '@/types/issue';
@@ -102,7 +102,6 @@ export default function ReportFAB() {
 
   return (
     <>
-      {/* FAB */}
       <motion.button
         onClick={handleFABClick}
         whileHover={{ scale: 1.05 }}
@@ -112,7 +111,6 @@ export default function ReportFAB() {
         <Plus className="h-6 w-6" />
       </motion.button>
 
-      {/* Bottom Sheet */}
       <AnimatePresence>
         {open && (
           <>
@@ -140,17 +138,13 @@ export default function ReportFAB() {
 
                 {step === 'form' && (
                   <div className="space-y-4">
-                    {/* Image */}
                     <div>
                       <label className="text-sm font-semibold tracking-tight text-foreground mb-1.5 block">Photo</label>
                       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageChange} />
                       {image ? (
                         <div className="relative aspect-video rounded-xl overflow-hidden bg-muted">
                           <img src={image} alt="Preview" className="w-full h-full object-cover" />
-                          <button
-                            onClick={() => setImage(null)}
-                            className="absolute top-2 right-2 p-1 rounded-full bg-foreground/60 text-background"
-                          >
+                          <button onClick={() => setImage(null)} className="absolute top-2 right-2 p-1 rounded-full bg-foreground/60 text-background">
                             <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -165,7 +159,6 @@ export default function ReportFAB() {
                       )}
                     </div>
 
-                    {/* Location */}
                     <div>
                       <label className="text-sm font-semibold tracking-tight text-foreground mb-1.5 block">Location</label>
                       <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted text-sm">
@@ -180,7 +173,6 @@ export default function ReportFAB() {
                       </div>
                     </div>
 
-                    {/* Type */}
                     <div>
                       <label className="text-sm font-semibold tracking-tight text-foreground mb-1.5 block">Problem Type</label>
                       <select
@@ -194,7 +186,6 @@ export default function ReportFAB() {
                       </select>
                     </div>
 
-                    {/* Description */}
                     <div>
                       <label className="text-sm font-semibold tracking-tight text-foreground mb-1.5 block">Description</label>
                       <textarea
@@ -206,7 +197,6 @@ export default function ReportFAB() {
                       />
                     </div>
 
-                    {/* Submit */}
                     <button
                       onClick={handleSubmit}
                       disabled={!image || !description.trim() || locating}
@@ -259,6 +249,3 @@ export default function ReportFAB() {
     </>
   );
 }
-
-// Need to import Users for the duplicate step
-import { Users } from 'lucide-react';
