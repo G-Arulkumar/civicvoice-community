@@ -14,7 +14,77 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      issue_reports: {
+        Row: {
+          created_at: string
+          id: string
+          issue_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          issue_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          issue_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_reports_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      issues: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          image_url: string
+          last_reported: string
+          lat: number
+          lng: number
+          location_name: string
+          report_count: number
+          status: Database["public"]["Enums"]["issue_status"]
+          type: Database["public"]["Enums"]["issue_type"]
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          image_url: string
+          last_reported?: string
+          lat: number
+          lng: number
+          location_name: string
+          report_count?: number
+          status?: Database["public"]["Enums"]["issue_status"]
+          type: Database["public"]["Enums"]["issue_type"]
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string
+          last_reported?: string
+          lat?: number
+          lng?: number
+          location_name?: string
+          report_count?: number
+          status?: Database["public"]["Enums"]["issue_status"]
+          type?: Database["public"]["Enums"]["issue_type"]
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +93,15 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      issue_status: "unsolved" | "solved"
+      issue_type:
+        | "Pothole"
+        | "Garbage"
+        | "Drainage"
+        | "Street Light"
+        | "Water Leakage"
+        | "Road Damage"
+        | "Other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +228,17 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      issue_status: ["unsolved", "solved"],
+      issue_type: [
+        "Pothole",
+        "Garbage",
+        "Drainage",
+        "Street Light",
+        "Water Leakage",
+        "Road Damage",
+        "Other",
+      ],
+    },
   },
 } as const
