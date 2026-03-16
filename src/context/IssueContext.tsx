@@ -72,28 +72,33 @@ export function IssueProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchIssues = useCallback(async () => {
-    const { data: issueRows, error } = await supabase
-      .from('issues')
-      .select('*')
-      .order('last_reported', { ascending: false });
+    try {
+      const { data: issueRows, error } = await supabase
+        .from('issues')
+        .select('*')
+        .order('last_reported', { ascending: false });
 
-    if (error || !issueRows) {
-      console.error('Error fetching issues:', error);
+      if (error || !issueRows) {
+        console.error('Error fetching issues:', error);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch all reports
+      const { data: reports } = await supabase.from('issue_reports').select('issue_id, user_id');
+      const reportMap = new Map<string, string[]>();
+      (reports || []).forEach((r) => {
+        const list = reportMap.get(r.issue_id) || [];
+        list.push(r.user_id);
+        reportMap.set(r.issue_id, list);
+      });
+
+      setIssues(issueRows.map((row) => dbToIssue(row, reportMap.get(row.id) || [])));
+    } catch (err) {
+      console.error('Failed to fetch issues:', err);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Fetch all reports
-    const { data: reports } = await supabase.from('issue_reports').select('issue_id, user_id');
-    const reportMap = new Map<string, string[]>();
-    (reports || []).forEach((r) => {
-      const list = reportMap.get(r.issue_id) || [];
-      list.push(r.user_id);
-      reportMap.set(r.issue_id, list);
-    });
-
-    setIssues(issueRows.map((row) => dbToIssue(row, reportMap.get(row.id) || [])));
-    setLoading(false);
   }, []);
 
   useEffect(() => {
