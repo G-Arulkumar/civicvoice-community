@@ -1,32 +1,49 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Shield, ArrowLeft } from 'lucide-react';
+import { Shield, ArrowLeft, Loader2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 
 export default function Login() {
-  const { login } = useAuth();
+  const { signInWithOtp, verifyOtp } = useAuth();
   const navigate = useNavigate();
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
+  const [loading, setLoading] = useState(false);
 
-  const handleSendOtp = () => {
-    if (phone.length < 10) {
+  const handleSendOtp = async () => {
+    const cleaned = phone.replace(/\s/g, '');
+    if (cleaned.length < 10) {
       toast.error('Enter a valid mobile number');
       return;
     }
-    setStep('otp');
-    toast.success('OTP sent! (Demo: use any 4 digits)');
-  };
-
-  const handleVerify = () => {
-    if (otp.length < 4) {
-      toast.error('Enter a valid OTP');
+    setLoading(true);
+    const formatted = cleaned.startsWith('+') ? cleaned : `+91${cleaned}`;
+    const { error } = await signInWithOtp(formatted);
+    setLoading(false);
+    if (error) {
+      toast.error(error.message || 'Failed to send OTP');
       return;
     }
-    login(phone);
+    setPhone(formatted);
+    setStep('otp');
+    toast.success('OTP sent!');
+  };
+
+  const handleVerify = async () => {
+    if (otp.length < 6) {
+      toast.error('Enter the 6-digit OTP');
+      return;
+    }
+    setLoading(true);
+    const { error } = await verifyOtp(phone, otp);
+    setLoading(false);
+    if (error) {
+      toast.error(error.message || 'Invalid OTP');
+      return;
+    }
     toast.success('Logged in successfully');
     navigate('/');
   };
@@ -55,9 +72,11 @@ export default function Login() {
               className="w-full px-3 py-2.5 rounded-xl bg-muted text-sm text-foreground border-0 focus:ring-2 focus:ring-primary outline-none placeholder:text-muted-foreground"
             />
           </div>
-          <button onClick={handleSendOtp} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors">
+          <button onClick={handleSendOtp} disabled={loading} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             Send OTP
           </button>
+          <p className="text-xs text-muted-foreground text-center">Test number: +919876543210 / OTP: 123456</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -69,12 +88,13 @@ export default function Login() {
               maxLength={6}
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
-              placeholder="● ● ● ●"
+              placeholder="● ● ● ● ● ●"
               className="w-full px-3 py-2.5 rounded-xl bg-muted text-sm text-foreground border-0 focus:ring-2 focus:ring-primary outline-none text-center tracking-[0.5em] placeholder:text-muted-foreground"
             />
             <p className="text-xs text-muted-foreground mt-1.5">Sent to {phone}</p>
           </div>
-          <button onClick={handleVerify} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors">
+          <button onClick={handleVerify} disabled={loading} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             Verify & Login
           </button>
           <button onClick={() => setStep('phone')} className="w-full py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">

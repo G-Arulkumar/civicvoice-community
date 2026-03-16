@@ -15,7 +15,8 @@ export default function ReportFAB() {
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<'form' | 'checking' | 'duplicate' | 'success'>('form');
-  const [image, setImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [type, setType] = useState<IssueType>('Pothole');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
@@ -55,46 +56,51 @@ export default function ReportFAB() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setImageFile(file);
       const reader = new FileReader();
-      reader.onloadend = () => setImage(reader.result as string);
+      reader.onloadend = () => setImagePreview(reader.result as string);
       reader.readAsDataURL(file);
     }
   };
 
-  const handleSubmit = () => {
-    if (!image || !description.trim() || !location || !user) return;
+  const handleSubmit = async () => {
+    if (!imageFile || !description.trim() || !location || !user) return;
 
     setStep('checking');
 
-    setTimeout(() => {
-      const dup = findNearbyDuplicate(type, location.lat, location.lng);
-      if (dup) {
-        setDuplicateIssue(dup);
-        const added = addReport(dup.id, user.id);
-        setStep('duplicate');
-        if (!added) {
-          toast.error('You have already reported this issue');
-        }
-      } else {
-        addIssue({
-          type,
-          description,
-          image,
-          status: 'unsolved',
-          locationName: location.name,
-          lat: location.lat,
-          lng: location.lng,
-          userId: user.id,
-        });
-        setStep('success');
+    const dup = findNearbyDuplicate(type, location.lat, location.lng);
+    if (dup) {
+      setDuplicateIssue(dup);
+      const added = await addReport(dup.id, user.id);
+      setStep('duplicate');
+      if (!added) {
+        toast.error('You have already reported this issue');
       }
-    }, 1500);
+    } else {
+      const result = await addIssue({
+        type,
+        description,
+        imageFile,
+        status: 'unsolved',
+        locationName: location.name,
+        lat: location.lat,
+        lng: location.lng,
+        userId: user.id,
+      });
+      if (result === null) {
+        toast.error('Failed to submit report');
+        setStep('form');
+        return;
+      }
+      setStep('success');
+    }
   };
 
   const handleClose = () => {
     setOpen(false);
     setStep('form');
-    setImage(null);
+    setImageFile(null);
+    setImagePreview(null);
     setDescription('');
     setType('Pothole');
     setDuplicateIssue(null);
@@ -141,10 +147,10 @@ export default function ReportFAB() {
                     <div>
                       <label className="text-sm font-semibold tracking-tight text-foreground mb-1.5 block">Photo</label>
                       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageChange} />
-                      {image ? (
+                      {imagePreview ? (
                         <div className="relative aspect-video rounded-xl overflow-hidden bg-muted">
-                          <img src={image} alt="Preview" className="w-full h-full object-cover" />
-                          <button onClick={() => setImage(null)} className="absolute top-2 right-2 p-1 rounded-full bg-foreground/60 text-background">
+                          <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                          <button onClick={() => { setImageFile(null); setImagePreview(null); }} className="absolute top-2 right-2 p-1 rounded-full bg-foreground/60 text-background">
                             <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
@@ -199,7 +205,7 @@ export default function ReportFAB() {
 
                     <button
                       onClick={handleSubmit}
-                      disabled={!image || !description.trim() || locating}
+                      disabled={!imageFile || !description.trim() || locating}
                       className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
                       Submit Report

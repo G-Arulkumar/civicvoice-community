@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
 import { useIssues } from '@/context/IssueContext';
 import { sortIssues } from '@/lib/issueUtils';
 import { IssueStatus } from '@/types/issue';
@@ -14,15 +15,22 @@ const TABS: { label: string; value: FilterTab }[] = [
 ];
 
 export default function IssueFeed() {
-  const { issues } = useIssues();
+  const { issues, loading } = useIssues();
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
 
   const filtered = activeTab === 'all' ? issues : issues.filter((i) => i.status === activeTab);
   const sorted = sortIssues(filtered);
 
+  if (loading) {
+    return (
+      <div className="flex justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div>
-      {/* Tab Bar */}
       <div className="flex gap-1 mb-6 bg-muted p-1 rounded-lg w-fit">
         {TABS.map((tab) => (
           <button
@@ -46,7 +54,6 @@ export default function IssueFeed() {
         ))}
       </div>
 
-      {/* Issue Grid */}
       {sorted.length === 0 ? (
         <div className="text-center py-20">
           <p className="text-muted-foreground text-lg">Your neighborhood is looking good.</p>
