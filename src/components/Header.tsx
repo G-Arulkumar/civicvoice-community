@@ -30,7 +30,7 @@ export default function Header() {
             <div className="flex items-center gap-2 ml-2">
               <span className="text-xs font-medium text-muted-foreground">{user?.phone}</span>
               <button
-                onClick={logout}
+                onClick={() => logout()}
                 className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
               >
                 <LogOut className="h-4 w-4" />
