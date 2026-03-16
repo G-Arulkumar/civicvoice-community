@@ -6,7 +6,7 @@ export type DbIssue = Tables<'issues'>;
 
 export interface Issue {
   id: string;
-  type: string;
+  type: IssueType;
   description: string;
   image: string;
   status: 'unsolved' | 'solved';
