@@ -71,7 +71,7 @@ export default function ReportFAB() {
     const dup = findNearbyDuplicate(type, location.lat, location.lng);
     if (dup) {
       setDuplicateIssue(dup);
-      const added = await addReport(dup.id, user.id);
+      const added = await addReport(dup.id, user.uid);
       setStep('duplicate');
       if (!added) {
         toast.error('You have already reported this issue');
