@@ -28,7 +28,7 @@ export default function Header() {
 
           {isAuthenticated ? (
             <div className="flex items-center gap-2 ml-2">
-              <span className="text-xs font-medium text-muted-foreground">{user?.email}</span>
+              <span className="text-xs font-medium text-muted-foreground">{user?.phoneNumber || user?.email}</span>
               <button
                 onClick={() => logout()}
                 className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
