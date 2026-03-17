@@ -1,11 +1,40 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Camera, MapPin, Loader2, Check, Users } from 'lucide-react';
+import { Plus, X, Camera, MapPin, Loader2, Check, Users, AlertTriangle, ImagePlus } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useIssues } from '@/context/IssueContext';
 import { ISSUE_TYPES, IssueType } from '@/types/issue';
 import { toast } from 'sonner';
+
+const MAX_IMAGE_SIZE = 1024; // max dimension in px for compression
+
+function compressImage(file: File): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const { width, height } = img;
+      if (width <= MAX_IMAGE_SIZE && height <= MAX_IMAGE_SIZE) {
+        resolve(file);
+        return;
+      }
+      const scale = MAX_IMAGE_SIZE / Math.max(width, height);
+      const canvas = document.createElement('canvas');
+      canvas.width = width * scale;
+      canvas.height = height * scale;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => resolve(new File([blob!], file.name, { type: 'image/jpeg' })),
+        'image/jpeg',
+        0.8
+      );
+    };
+    img.src = url;
+  });
+}
 
 export default function ReportFAB() {
   const { isAuthenticated, user } = useAuth();
@@ -14,7 +43,7 @@ export default function ReportFAB() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<'form' | 'checking' | 'duplicate' | 'success'>('form');
+  const [step, setStep] = useState<'form' | 'checking' | 'duplicate' | 'success' | 'error'>('form');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [type, setType] = useState<IssueType>('Pothole');
@@ -22,6 +51,7 @@ export default function ReportFAB() {
   const [location, setLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
   const [locating, setLocating] = useState(false);
   const [duplicateIssue, setDuplicateIssue] = useState<any>(null);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const handleFABClick = () => {
     if (!isAuthenticated) {
@@ -37,15 +67,26 @@ export default function ReportFAB() {
     setLocating(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, name: 'Current Location' });
+        async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          // Try reverse geocoding
+          let name = 'Current Location';
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&zoom=16`);
+            const data = await res.json();
+            if (data?.address) {
+              const { road, suburb, city, town, village } = data.address;
+              name = [road, suburb || city || town || village].filter(Boolean).join(', ') || name;
+            }
+          } catch { /* fallback to default name */ }
+          setLocation({ lat: latitude, lng: longitude, name });
           setLocating(false);
         },
         () => {
           setLocation({ lat: 28.6139, lng: 77.2090, name: 'New Delhi (default)' });
           setLocating(false);
         },
-        { timeout: 5000 }
+        { timeout: 8000 }
       );
     } else {
       setLocation({ lat: 28.6139, lng: 77.2090, name: 'New Delhi (default)' });
@@ -53,46 +94,56 @@ export default function ReportFAB() {
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => setImagePreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
+    if (!file) return;
+    
+    // Compress before preview
+    const compressed = await compressImage(file);
+    setImageFile(compressed);
+    const reader = new FileReader();
+    reader.onloadend = () => setImagePreview(reader.result as string);
+    reader.readAsDataURL(compressed);
+  }, []);
 
   const handleSubmit = async () => {
-    if (!imageFile || !description.trim() || !location || !user) return;
+    if (!imageFile) { toast.error('Please add a photo'); return; }
+    if (!description.trim()) { toast.error('Please add a description'); return; }
+    if (!location || !user) return;
 
     setStep('checking');
 
-    const dup = findNearbyDuplicate(type, location.lat, location.lng);
-    if (dup) {
-      setDuplicateIssue(dup);
-      const added = await addReport(dup.id, user.uid);
-      setStep('duplicate');
-      if (!added) {
-        toast.error('You have already reported this issue');
+    try {
+      const dup = findNearbyDuplicate(type, location.lat, location.lng);
+      if (dup) {
+        setDuplicateIssue(dup);
+        const added = await addReport(dup.id, user.uid);
+        setStep('duplicate');
+        if (!added) {
+          toast.info('You have already reported this issue');
+        }
+      } else {
+        const result = await addIssue({
+          type,
+          description,
+          imageFile,
+          status: 'unsolved',
+          locationName: location.name,
+          lat: location.lat,
+          lng: location.lng,
+          userId: user.uid,
+        });
+        if (result === null) {
+          setErrorMsg('Failed to submit report. Please try again.');
+          setStep('error');
+          return;
+        }
+        setStep('success');
       }
-    } else {
-      const result = await addIssue({
-        type,
-        description,
-        imageFile,
-        status: 'unsolved',
-        locationName: location.name,
-        lat: location.lat,
-        lng: location.lng,
-        userId: user.uid,
-      });
-      if (result === null) {
-        toast.error('Failed to submit report');
-        setStep('form');
-        return;
-      }
-      setStep('success');
+    } catch (err) {
+      console.error('Submit error:', err);
+      setErrorMsg('Something went wrong. Please try again.');
+      setStep('error');
     }
   };
 
@@ -104,7 +155,10 @@ export default function ReportFAB() {
     setDescription('');
     setType('Pothole');
     setDuplicateIssue(null);
+    setErrorMsg('');
   };
+
+  const formValid = !!imageFile && description.trim().length > 0 && !locating;
 
   return (
     <>
@@ -135,23 +189,37 @@ export default function ReportFAB() {
               className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-2xl max-h-[90vh] overflow-y-auto"
             >
               <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
+                {/* Header */}
+                <div className="flex justify-between items-center mb-2">
                   <h2 className="text-lg font-bold text-foreground">Report a Problem</h2>
                   <button onClick={handleClose} className="p-1 rounded-md hover:bg-muted transition-colors">
                     <X className="h-5 w-5 text-muted-foreground" />
                   </button>
                 </div>
 
+                {/* Progress bar for form step */}
+                {step === 'form' && (
+                  <div className="flex gap-1 mb-5">
+                    <div className={`h-1 flex-1 rounded-full ${imageFile ? 'bg-primary' : 'bg-muted'}`} />
+                    <div className={`h-1 flex-1 rounded-full ${location ? 'bg-primary' : 'bg-muted'}`} />
+                    <div className={`h-1 flex-1 rounded-full ${description.trim() ? 'bg-primary' : 'bg-muted'}`} />
+                  </div>
+                )}
+
                 {step === 'form' && (
                   <div className="space-y-4">
+                    {/* Photo */}
                     <div>
-                      <label className="text-sm font-semibold tracking-tight text-foreground mb-1.5 block">Photo</label>
+                      <label className="text-sm font-semibold tracking-tight text-foreground mb-1.5 block">Photo *</label>
                       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageChange} />
                       {imagePreview ? (
                         <div className="relative aspect-video rounded-xl overflow-hidden bg-muted">
                           <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
                           <button onClick={() => { setImageFile(null); setImagePreview(null); }} className="absolute top-2 right-2 p-1 rounded-full bg-foreground/60 text-background">
                             <X className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={() => fileRef.current?.click()} className="absolute bottom-2 right-2 px-2.5 py-1 rounded-full bg-foreground/60 text-background text-xs font-medium flex items-center gap-1">
+                            <ImagePlus className="h-3 w-3" /> Change
                           </button>
                         </div>
                       ) : (
@@ -165,47 +233,58 @@ export default function ReportFAB() {
                       )}
                     </div>
 
+                    {/* Location */}
                     <div>
                       <label className="text-sm font-semibold tracking-tight text-foreground mb-1.5 block">Location</label>
                       <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted text-sm">
                         <MapPin className="h-4 w-4 text-primary shrink-0" />
                         {locating ? (
                           <span className="text-muted-foreground flex items-center gap-2">
-                            <Loader2 className="h-3 w-3 animate-spin" /> Detecting...
+                            <Loader2 className="h-3 w-3 animate-spin" /> Detecting location...
                           </span>
                         ) : (
-                          <span className="text-foreground">{location?.name}</span>
+                          <span className="text-foreground truncate">{location?.name}</span>
                         )}
                       </div>
                     </div>
 
+                    {/* Problem Type */}
                     <div>
                       <label className="text-sm font-semibold tracking-tight text-foreground mb-1.5 block">Problem Type</label>
-                      <select
-                        value={type}
-                        onChange={(e) => setType(e.target.value as IssueType)}
-                        className="w-full px-3 py-2.5 rounded-xl bg-muted text-sm text-foreground border-0 focus:ring-2 focus:ring-primary outline-none"
-                      >
+                      <div className="flex flex-wrap gap-2">
                         {ISSUE_TYPES.map((t) => (
-                          <option key={t} value={t}>{t}</option>
+                          <button
+                            key={t}
+                            onClick={() => setType(t)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                              type === t
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            {t}
+                          </button>
                         ))}
-                      </select>
+                      </div>
                     </div>
 
+                    {/* Description */}
                     <div>
-                      <label className="text-sm font-semibold tracking-tight text-foreground mb-1.5 block">Description</label>
+                      <label className="text-sm font-semibold tracking-tight text-foreground mb-1.5 block">Description *</label>
                       <textarea
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Describe the problem..."
+                        placeholder="Describe the problem briefly..."
                         rows={3}
+                        maxLength={500}
                         className="w-full px-3 py-2.5 rounded-xl bg-muted text-sm text-foreground border-0 focus:ring-2 focus:ring-primary outline-none resize-none placeholder:text-muted-foreground"
                       />
+                      <p className="text-xs text-muted-foreground text-right mt-0.5">{description.length}/500</p>
                     </div>
 
                     <button
                       onClick={handleSubmit}
-                      disabled={!imageFile || !description.trim() || locating}
+                      disabled={!formValid}
                       className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
                       Submit Report
@@ -226,9 +305,9 @@ export default function ReportFAB() {
                       <Users className="h-6 w-6 text-primary" />
                     </div>
                     <p className="text-foreground font-semibold">
-                      {duplicateIssue?.reportCount} people already reported this.
+                      {(duplicateIssue?.reportCount || 0) + 1} people reported this issue
                     </p>
-                    <p className="text-sm text-muted-foreground">Adding your voice to the report.</p>
+                    <p className="text-sm text-muted-foreground">Your voice has been added to the existing report.</p>
                     <button onClick={handleClose} className="mt-4 px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
                       Done
                     </button>
@@ -237,14 +316,37 @@ export default function ReportFAB() {
 
                 {step === 'success' && (
                   <div className="flex flex-col items-center py-8 gap-3 text-center">
-                    <div className="h-12 w-12 rounded-full bg-solved/10 flex items-center justify-center">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', damping: 15 }}
+                      className="h-12 w-12 rounded-full bg-solved/10 flex items-center justify-center"
+                    >
                       <Check className="h-6 w-6 text-solved" />
-                    </div>
-                    <p className="text-foreground font-semibold">Report submitted successfully.</p>
+                    </motion.div>
+                    <p className="text-foreground font-semibold">Report submitted!</p>
                     <p className="text-sm text-muted-foreground">Local authorities have been notified.</p>
                     <button onClick={handleClose} className="mt-4 px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
                       Done
                     </button>
+                  </div>
+                )}
+
+                {step === 'error' && (
+                  <div className="flex flex-col items-center py-8 gap-3 text-center">
+                    <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
+                      <AlertTriangle className="h-6 w-6 text-destructive" />
+                    </div>
+                    <p className="text-foreground font-semibold">Submission failed</p>
+                    <p className="text-sm text-muted-foreground">{errorMsg}</p>
+                    <div className="flex gap-2 mt-4">
+                      <button onClick={() => setStep('form')} className="px-5 py-2.5 rounded-xl bg-muted text-foreground text-sm font-semibold">
+                        Try Again
+                      </button>
+                      <button onClick={handleClose} className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
+                        Close
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
