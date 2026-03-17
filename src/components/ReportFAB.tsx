@@ -85,7 +85,7 @@ export default function ReportFAB() {
         locationName: location.name,
         lat: location.lat,
         lng: location.lng,
-        userId: user.id,
+        userId: user.uid,
       });
       if (result === null) {
         toast.error('Failed to submit report');
