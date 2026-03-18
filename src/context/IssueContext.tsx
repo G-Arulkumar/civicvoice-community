@@ -181,7 +181,7 @@ export function IssueProvider({ children }: { children: React.ReactNode }) {
     await supabase.from('issue_reports').insert({ issue_id: newIssue.id, user_id: data.userId });
 
     await fetchIssues();
-    return issues.find((i) => i.id === newIssue.id) || null;
+    return dbToIssue(newIssue, [data.userId]);
   }, [fetchIssues, issues]);
 
   return (
