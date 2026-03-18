@@ -315,6 +315,19 @@ export default function ReportFAB() {
                   </div>
                 )}
 
+                {step === 'already-reported' && (
+                  <div className="flex flex-col items-center py-8 gap-3 text-center">
+                    <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                      <Users className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-foreground font-semibold">Already reported</p>
+                    <p className="text-sm text-muted-foreground">You have already reported this issue. Your report is counted and authorities have been notified.</p>
+                    <button onClick={handleClose} className="mt-4 px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
+                      Done
+                    </button>
+                  </div>
+                )}
+
                 {step === 'success' && (
                   <div className="flex flex-col items-center py-8 gap-3 text-center">
                     <motion.div
