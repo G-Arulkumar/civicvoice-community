@@ -43,7 +43,7 @@ export default function ReportFAB() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<'form' | 'checking' | 'duplicate' | 'success' | 'error'>('form');
+  const [step, setStep] = useState<'form' | 'checking' | 'duplicate' | 'already-reported' | 'success' | 'error'>('form');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [type, setType] = useState<IssueType>('Pothole');
