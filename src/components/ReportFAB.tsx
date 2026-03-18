@@ -43,7 +43,7 @@ export default function ReportFAB() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<'form' | 'checking' | 'duplicate' | 'success' | 'error'>('form');
+  const [step, setStep] = useState<'form' | 'checking' | 'duplicate' | 'already-reported' | 'success' | 'error'>('form');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [type, setType] = useState<IssueType>('Pothole');
@@ -118,9 +118,10 @@ export default function ReportFAB() {
       if (dup) {
         setDuplicateIssue(dup);
         const added = await addReport(dup.id, user.uid);
-        setStep('duplicate');
-        if (!added) {
-          toast.info('You have already reported this issue');
+        if (added) {
+          setStep('duplicate');
+        } else {
+          setStep('already-reported');
         }
       } else {
         const result = await addIssue({
@@ -308,6 +309,19 @@ export default function ReportFAB() {
                       {(duplicateIssue?.reportCount || 0) + 1} people reported this issue
                     </p>
                     <p className="text-sm text-muted-foreground">Your voice has been added to the existing report.</p>
+                    <button onClick={handleClose} className="mt-4 px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
+                      Done
+                    </button>
+                  </div>
+                )}
+
+                {step === 'already-reported' && (
+                  <div className="flex flex-col items-center py-8 gap-3 text-center">
+                    <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                      <Users className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-foreground font-semibold">Already reported</p>
+                    <p className="text-sm text-muted-foreground">You have already reported this issue. Your report is counted and authorities have been notified.</p>
                     <button onClick={handleClose} className="mt-4 px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
                       Done
                     </button>
