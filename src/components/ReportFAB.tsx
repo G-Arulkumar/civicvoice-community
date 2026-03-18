@@ -118,9 +118,10 @@ export default function ReportFAB() {
       if (dup) {
         setDuplicateIssue(dup);
         const added = await addReport(dup.id, user.uid);
-        setStep('duplicate');
-        if (!added) {
-          toast.info('You have already reported this issue');
+        if (added) {
+          setStep('duplicate');
+        } else {
+          setStep('already-reported');
         }
       } else {
         const result = await addIssue({
