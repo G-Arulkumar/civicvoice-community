@@ -1,0 +1,1 @@
+ALTER TABLE public.issue_reports DROP CONSTRAINT issue_reports_user_id_fkey;
