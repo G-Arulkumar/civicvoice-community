@@ -68,25 +68,33 @@ export default function ReportFAB() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
-          const { latitude, longitude } = pos.coords;
-          // Try reverse geocoding
+          const { latitude, longitude, accuracy } = pos.coords;
+          console.log(`Location accuracy: ${accuracy}m`);
+          // Try reverse geocoding with high zoom for street-level detail
           let name = 'Current Location';
           try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&zoom=16`);
+            const res = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&zoom=18&addressdetails=1`,
+              { headers: { 'Accept-Language': 'en' } }
+            );
             const data = await res.json();
             if (data?.address) {
-              const { road, suburb, city, town, village } = data.address;
-              name = [road, suburb || city || town || village].filter(Boolean).join(', ') || name;
+              const { house_number, road, neighbourhood, suburb, city, town, village, state_district } = data.address;
+              const street = [house_number, road].filter(Boolean).join(' ');
+              const area = neighbourhood || suburb || '';
+              const locality = city || town || village || state_district || '';
+              name = [street, area, locality].filter(Boolean).join(', ') || name;
             }
           } catch { /* fallback to default name */ }
           setLocation({ lat: latitude, lng: longitude, name });
           setLocating(false);
         },
-        () => {
+        (err) => {
+          console.warn('Geolocation error:', err.message);
           setLocation({ lat: 28.6139, lng: 77.2090, name: 'New Delhi (default)' });
           setLocating(false);
         },
-        { timeout: 8000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     } else {
       setLocation({ lat: 28.6139, lng: 77.2090, name: 'New Delhi (default)' });
