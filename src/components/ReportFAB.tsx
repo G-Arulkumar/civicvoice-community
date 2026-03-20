@@ -79,11 +79,11 @@ export default function ReportFAB() {
             );
             const data = await res.json();
             if (data?.address) {
-              const { house_number, road, neighbourhood, suburb, city, town, village, state_district } = data.address;
-              const street = [house_number, road].filter(Boolean).join(' ');
-              const area = neighbourhood || suburb || '';
-              const locality = city || town || village || state_district || '';
-              name = [street, area, locality].filter(Boolean).join(', ') || name;
+              const { road, neighbourhood, suburb, city, town, village, state_district } = data.address;
+              const subLocality = suburb?.replace(/^Zone \d+\s*/i, '') || neighbourhood || road || '';
+              const locality = city || town || village || '';
+              const district = (state_district && state_district !== locality) ? state_district : '';
+              name = [subLocality, locality, district].filter(Boolean).join(', ') || name;
             }
           } catch { /* fallback to default name */ }
           setLocation({ lat: latitude, lng: longitude, name });
