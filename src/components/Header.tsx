@@ -1,6 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { Shield, User, LogOut } from 'lucide-react';
+import { Shield, User, LogOut, Settings } from 'lucide-react';
+
+const ADMIN_PHONES = ['+918939202794'];
 
 export default function Header() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -28,6 +30,19 @@ export default function Header() {
 
           {isAuthenticated ? (
             <div className="flex items-center gap-2 ml-2">
+              {user?.phoneNumber && ADMIN_PHONES.includes(user.phoneNumber) && (
+                <Link
+                  to="/admin"
+                  className={`p-1.5 rounded-md transition-colors ${
+                    location.pathname === '/admin'
+                      ? 'text-primary bg-primary/10'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                  }`}
+                  title="Admin Dashboard"
+                >
+                  <Settings className="h-4 w-4" />
+                </Link>
+              )}
               <span className="text-xs font-medium text-muted-foreground">{user?.phoneNumber || user?.email}</span>
               <button
                 onClick={() => logout()}
