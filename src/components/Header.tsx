@@ -1,6 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { Shield, User, LogOut } from 'lucide-react';
+import { Shield, User, LogOut, Settings } from 'lucide-react';
+
+const ADMIN_PHONES = ['+918939202794'];
 
 export default function Header() {
   const { user, isAuthenticated, logout } = useAuth();
