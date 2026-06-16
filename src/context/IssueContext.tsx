@@ -1,24 +1,22 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Tables } from '@/integrations/supabase/types';
-import { IssueType } from '@/types/issue';
+import { IssueType, IssueStatus, Issue } from '@/types/issue';
 
-export type DbIssue = Tables<'issues'>;
-
-export interface Issue {
+interface DbIssue {
   id: string;
   type: IssueType;
   description: string;
-  image: string;
-  status: 'unsolved' | 'solved';
-  reportCount: number;
-  lastReported: Date;
-  createdAt: Date;
-  locationName: string;
+  image_url: string;
+  location_name: string;
   lat: number;
   lng: number;
-  reportedBy: string[];
+  status: IssueStatus;
+  report_count: number;
+  last_reported: string;
+  created_at: string;
 }
+
+export type { Issue };
 
 function dbToIssue(row: DbIssue, reporters: string[]): Issue {
   return {
