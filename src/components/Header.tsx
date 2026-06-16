@@ -1,8 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { isAdminPhone } from '@/lib/admins';
 import { Shield, User, LogOut, Settings } from 'lucide-react';
-
-const ADMIN_PHONES = ['+918939202794'];
 
 export default function Header() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -30,7 +29,7 @@ export default function Header() {
 
           {isAuthenticated ? (
             <div className="flex items-center gap-2 ml-2">
-              {user?.phoneNumber && ADMIN_PHONES.includes(user.phoneNumber) && (
+              {isAdminPhone(user?.phoneNumber) && (
                 <Link
                   to="/admin"
                   className={`p-1.5 rounded-md transition-colors ${

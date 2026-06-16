@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useIssues, Issue } from '@/context/IssueContext';
 import { supabase } from '@/lib/supabase';
+import { isAdminPhone } from '@/lib/admins';
 import { toast } from 'sonner';
 import { Shield, Trash2, CheckCircle, AlertTriangle, BarChart3, FileText, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -20,15 +21,13 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
-const ADMIN_PHONES = ['+918939202794'];
-
 export default function Admin() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { issues, refreshIssues, loading } = useIssues();
   const navigate = useNavigate();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const isAdmin = isAuthenticated && user?.phoneNumber && ADMIN_PHONES.includes(user.phoneNumber);
+  const isAdmin = isAuthenticated && isAdminPhone(user?.phoneNumber);
 
   useEffect(() => {
     if (!isLoading && !isAdmin) {
