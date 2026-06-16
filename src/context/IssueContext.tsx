@@ -180,7 +180,7 @@ export function IssueProvider({ children }: { children: React.ReactNode }) {
 
     await fetchIssues();
     return dbToIssue(newIssue, [data.userId]);
-  }, [fetchIssues, issues]);
+  }, [fetchIssues]);
 
   return (
     <IssueContext.Provider value={{ issues, loading, addReport, addIssue, findNearbyDuplicate, refreshIssues: fetchIssues }}>
