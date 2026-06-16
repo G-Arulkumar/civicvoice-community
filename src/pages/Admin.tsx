@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useIssues, Issue } from '@/context/IssueContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Shield, Trash2, CheckCircle, AlertTriangle, BarChart3, FileText, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
