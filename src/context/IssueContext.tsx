@@ -1,6 +1,10 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { IssueType, IssueStatus, Issue } from '@/types/issue';
+
+class UploadError extends Error {}
+class DbError extends Error {}
 
 interface DbIssue {
   id: string;
@@ -78,6 +82,7 @@ export function IssueProvider({ children }: { children: React.ReactNode }) {
 
       if (error || !issueRows) {
         console.error('Error fetching issues:', error);
+        toast.error('Could not load issues', { description: error?.message || 'Check your connection and try again.' });
         setLoading(false);
         return;
       }
@@ -92,8 +97,9 @@ export function IssueProvider({ children }: { children: React.ReactNode }) {
       });
 
       setIssues(issueRows.map((row) => dbToIssue(row, reportMap.get(row.id) || [])));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch issues:', err);
+      toast.error('Could not load issues', { description: err?.message || 'Network error.' });
     } finally {
       setLoading(false);
     }
@@ -115,15 +121,23 @@ export function IssueProvider({ children }: { children: React.ReactNode }) {
       .from('issue_reports')
       .insert({ issue_id: issueId, user_id: userId });
 
-    if (reportError) return false;
+    if (reportError) {
+      // Unique-violation = already reported (silent); otherwise surface
+      if (reportError.code !== '23505') {
+        console.error('Report error:', reportError);
+        toast.error('Could not add your report', { description: reportError.message });
+      }
+      return false;
+    }
 
     // Increment report count
     const issue = issues.find((i) => i.id === issueId);
     if (issue) {
-      await supabase
+      const { error: updateError } = await supabase
         .from('issues')
         .update({ report_count: issue.reportCount + 1, last_reported: new Date().toISOString() })
         .eq('id', issueId);
+      if (updateError) console.warn('Count update failed:', updateError);
     }
 
     await fetchIssues();
@@ -140,46 +154,62 @@ export function IssueProvider({ children }: { children: React.ReactNode }) {
     lng: number;
     userId: string;
   }): Promise<Issue | null> => {
-    // Upload image
-    const fileExt = data.imageFile.name.split('.').pop();
-    const filePath = `${crypto.randomUUID()}.${fileExt}`;
+    try {
+      // Upload image
+      const fileExt = data.imageFile.name.split('.').pop();
+      const filePath = `${crypto.randomUUID()}.${fileExt}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('issue-images')
-      .upload(filePath, data.imageFile);
+      const { error: uploadError } = await supabase.storage
+        .from('issue-images')
+        .upload(filePath, data.imageFile);
 
-    if (uploadError) {
-      console.error('Upload error:', uploadError);
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw new UploadError(uploadError.message || 'Image upload failed');
+      }
+
+      const { data: publicUrl } = supabase.storage.from('issue-images').getPublicUrl(filePath);
+
+      // Insert issue
+      const { data: newIssue, error: issueError } = await supabase
+        .from('issues')
+        .insert({
+          type: data.type as any,
+          description: data.description,
+          image_url: publicUrl.publicUrl,
+          status: 'unsolved',
+          location_name: data.locationName,
+          lat: data.lat,
+          lng: data.lng,
+        })
+        .select()
+        .single();
+
+      if (issueError || !newIssue) {
+        console.error('Issue insert error:', issueError);
+        throw new DbError(issueError?.message || 'Could not save report');
+      }
+
+      // Insert report for this user
+      const { error: reportError } = await supabase
+        .from('issue_reports')
+        .insert({ issue_id: newIssue.id, user_id: data.userId });
+      if (reportError) {
+        console.warn('Report insert error (non-fatal):', reportError);
+      }
+
+      await fetchIssues();
+      return dbToIssue(newIssue, [data.userId]);
+    } catch (err: any) {
+      if (err instanceof UploadError) {
+        toast.error('Image upload failed', { description: err.message + '. Please try a different photo or check your connection.' });
+      } else if (err instanceof DbError) {
+        toast.error('Could not save report', { description: err.message });
+      } else {
+        toast.error('Submission failed', { description: err?.message || 'Please try again.' });
+      }
       return null;
     }
-
-    const { data: publicUrl } = supabase.storage.from('issue-images').getPublicUrl(filePath);
-
-    // Insert issue
-    const { data: newIssue, error: issueError } = await supabase
-      .from('issues')
-      .insert({
-        type: data.type as any,
-        description: data.description,
-        image_url: publicUrl.publicUrl,
-        status: 'unsolved',
-        location_name: data.locationName,
-        lat: data.lat,
-        lng: data.lng,
-      })
-      .select()
-      .single();
-
-    if (issueError || !newIssue) {
-      console.error('Issue insert error:', issueError);
-      return null;
-    }
-
-    // Insert report for this user
-    await supabase.from('issue_reports').insert({ issue_id: newIssue.id, user_id: data.userId });
-
-    await fetchIssues();
-    return dbToIssue(newIssue, [data.userId]);
   }, [fetchIssues]);
 
   return (

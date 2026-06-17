@@ -65,53 +65,76 @@ export default function ReportFAB() {
 
   const detectLocation = () => {
     setLocating(true);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const { latitude, longitude, accuracy } = pos.coords;
-          console.log(`Location accuracy: ${accuracy}m`);
-          // Try reverse geocoding with high zoom for street-level detail
-          let name = 'Current Location';
-          try {
-            const res = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&zoom=18&addressdetails=1`,
-              { headers: { 'Accept-Language': 'en' } }
-            );
-            const data = await res.json();
-            if (data?.address) {
-              const { road, neighbourhood, suburb, city, town, village, state_district } = data.address;
-              const subLocality = suburb?.replace(/^Zone \d+\s*/i, '') || neighbourhood || road || '';
-              const locality = city || town || village || '';
-              const district = (state_district && state_district !== locality) ? state_district : '';
-              name = [subLocality, locality, district].filter(Boolean).join(', ') || name;
-            }
-          } catch { /* fallback to default name */ }
-          setLocation({ lat: latitude, lng: longitude, name });
-          setLocating(false);
-        },
-        (err) => {
-          console.warn('Geolocation error:', err.message);
-          setLocation({ lat: 28.6139, lng: 77.2090, name: 'New Delhi (default)' });
-          setLocating(false);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-      );
-    } else {
+    if (!navigator.geolocation) {
+      toast.error('Location not supported', { description: 'Your browser does not support GPS. Using a default location.' });
       setLocation({ lat: 28.6139, lng: 77.2090, name: 'New Delhi (default)' });
       setLocating(false);
+      return;
     }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude, accuracy } = pos.coords;
+        console.log(`Location accuracy: ${accuracy}m`);
+        let name = 'Current Location';
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&zoom=18&addressdetails=1`,
+            { headers: { 'Accept-Language': 'en' } }
+          );
+          const data = await res.json();
+          if (data?.address) {
+            const { road, neighbourhood, suburb, city, town, village, state_district } = data.address;
+            const subLocality = suburb?.replace(/^Zone \d+\s*/i, '') || neighbourhood || road || '';
+            const locality = city || town || village || '';
+            const district = (state_district && state_district !== locality) ? state_district : '';
+            name = [subLocality, locality, district].filter(Boolean).join(', ') || name;
+          }
+        } catch {
+          toast.warning('Address lookup failed', { description: 'Using raw coordinates.' });
+        }
+        setLocation({ lat: latitude, lng: longitude, name });
+        setLocating(false);
+      },
+      (err) => {
+        console.warn('Geolocation error:', err.message);
+        const desc =
+          err.code === err.PERMISSION_DENIED
+            ? 'Location permission was denied. Please enable it in browser settings.'
+            : err.code === err.POSITION_UNAVAILABLE
+            ? 'GPS signal unavailable. Try moving to an open area.'
+            : err.code === err.TIMEOUT
+            ? 'Location request timed out. Check your connection and try again.'
+            : 'Could not detect location.';
+        toast.error('Location detection failed', { description: desc });
+        setLocation({ lat: 28.6139, lng: 77.2090, name: 'New Delhi (default)' });
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
   };
 
   const handleImageChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
-    // Compress before preview
-    const compressed = await compressImage(file);
-    setImageFile(compressed);
-    const reader = new FileReader();
-    reader.onloadend = () => setImagePreview(reader.result as string);
-    reader.readAsDataURL(compressed);
+    if (!file.type.startsWith('image/')) {
+      toast.error('Invalid file', { description: 'Please select an image file.' });
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error('Image too large', { description: 'Please choose a photo under 15 MB.' });
+      return;
+    }
+    try {
+      const compressed = await compressImage(file);
+      setImageFile(compressed);
+      const reader = new FileReader();
+      reader.onerror = () => toast.error('Could not read image', { description: 'Try a different photo.' });
+      reader.onloadend = () => setImagePreview(reader.result as string);
+      reader.readAsDataURL(compressed);
+    } catch (err: any) {
+      console.error('Image processing failed:', err);
+      toast.error('Could not process image', { description: err?.message || 'Try a different photo.' });
+    }
   }, []);
 
   const handleSubmit = async () => {
