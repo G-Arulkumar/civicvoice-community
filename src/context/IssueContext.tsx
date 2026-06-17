@@ -97,8 +97,9 @@ export function IssueProvider({ children }: { children: React.ReactNode }) {
       });
 
       setIssues(issueRows.map((row) => dbToIssue(row, reportMap.get(row.id) || [])));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch issues:', err);
+      toast.error('Could not load issues', { description: err?.message || 'Network error.' });
     } finally {
       setLoading(false);
     }
