@@ -82,6 +82,7 @@ export function IssueProvider({ children }: { children: React.ReactNode }) {
 
       if (error || !issueRows) {
         console.error('Error fetching issues:', error);
+        toast.error('Could not load issues', { description: error?.message || 'Check your connection and try again.' });
         setLoading(false);
         return;
       }
