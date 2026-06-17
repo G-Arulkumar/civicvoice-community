@@ -48,8 +48,9 @@ export default function ReportFAB() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [type, setType] = useState<IssueType>('Pothole');
   const [description, setDescription] = useState('');
-  const [location, setLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
+  const [location, setLocation] = useState<{ lat: number; lng: number; name: string; accuracy?: number } | null>(null);
   const [locating, setLocating] = useState(false);
+  const watchIdRef = useRef<number | null>(null);
   const [duplicateIssue, setDuplicateIssue] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
