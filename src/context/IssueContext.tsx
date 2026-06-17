@@ -121,15 +121,23 @@ export function IssueProvider({ children }: { children: React.ReactNode }) {
       .from('issue_reports')
       .insert({ issue_id: issueId, user_id: userId });
 
-    if (reportError) return false;
+    if (reportError) {
+      // Unique-violation = already reported (silent); otherwise surface
+      if (reportError.code !== '23505') {
+        console.error('Report error:', reportError);
+        toast.error('Could not add your report', { description: reportError.message });
+      }
+      return false;
+    }
 
     // Increment report count
     const issue = issues.find((i) => i.id === issueId);
     if (issue) {
-      await supabase
+      const { error: updateError } = await supabase
         .from('issues')
         .update({ report_count: issue.reportCount + 1, last_reported: new Date().toISOString() })
         .eq('id', issueId);
+      if (updateError) console.warn('Count update failed:', updateError);
     }
 
     await fetchIssues();
