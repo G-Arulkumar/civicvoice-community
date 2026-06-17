@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Camera, MapPin, Loader2, Check, Users, AlertTriangle, ImagePlus } from 'lucide-react';
+import { Plus, X, Camera, MapPin, Loader2, Check, Users, AlertTriangle, ImagePlus, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useIssues } from '@/context/IssueContext';
 import { ISSUE_TYPES, IssueType } from '@/types/issue';
