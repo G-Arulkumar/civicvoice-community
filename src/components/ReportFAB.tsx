@@ -48,8 +48,9 @@ export default function ReportFAB() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [type, setType] = useState<IssueType>('Pothole');
   const [description, setDescription] = useState('');
-  const [location, setLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
+  const [location, setLocation] = useState<{ lat: number; lng: number; name: string; accuracy?: number } | null>(null);
   const [locating, setLocating] = useState(false);
+  const watchIdRef = useRef<number | null>(null);
   const [duplicateIssue, setDuplicateIssue] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -63,6 +64,29 @@ export default function ReportFAB() {
     detectLocation();
   };
 
+  const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=18&addressdetails=1`,
+        { headers: { 'Accept-Language': 'en' } }
+      );
+      const data = await res.json();
+      if (data?.address) {
+        const { road, neighbourhood, suburb, city, town, village, state_district } = data.address;
+        const subLocality = suburb?.replace(/^Zone \d+\s*/i, '') || neighbourhood || road || '';
+        const locality = city || town || village || '';
+        const district = (state_district && state_district !== locality) ? state_district : '';
+        const name = [subLocality, locality, district].filter(Boolean).join(', ');
+        if (name) return name;
+      }
+    } catch {
+      toast.warning('Address lookup failed', { description: 'Using raw coordinates.' });
+    }
+    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  };
+
+  // Multi-sample GPS: collect readings via watchPosition, accept first ≤15m,
+  // otherwise keep the best within ~12s. Discards stale/low-accuracy fixes.
   const detectLocation = () => {
     setLocating(true);
     if (!navigator.geolocation) {
@@ -71,32 +95,53 @@ export default function ReportFAB() {
       setLocating(false);
       return;
     }
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude, accuracy } = pos.coords;
-        console.log(`Location accuracy: ${accuracy}m`);
-        let name = 'Current Location';
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&zoom=18&addressdetails=1`,
-            { headers: { 'Accept-Language': 'en' } }
-          );
-          const data = await res.json();
-          if (data?.address) {
-            const { road, neighbourhood, suburb, city, town, village, state_district } = data.address;
-            const subLocality = suburb?.replace(/^Zone \d+\s*/i, '') || neighbourhood || road || '';
-            const locality = city || town || village || '';
-            const district = (state_district && state_district !== locality) ? state_district : '';
-            name = [subLocality, locality, district].filter(Boolean).join(', ') || name;
-          }
-        } catch {
-          toast.warning('Address lookup failed', { description: 'Using raw coordinates.' });
-        }
-        setLocation({ lat: latitude, lng: longitude, name });
+
+    // Clear any previous watcher
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+
+    const GOOD_ACCURACY_M = 15;
+    const MAX_WAIT_MS = 12000;
+    const MIN_WAIT_MS = 2500; // wait at least this long to let GPS converge
+    let best: GeolocationPosition | null = null;
+    const started = Date.now();
+    let settled = false;
+
+    const finish = async (pos: GeolocationPosition | null, errMsg?: string) => {
+      if (settled) return;
+      settled = true;
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      if (!pos) {
+        toast.error('Location detection failed', { description: errMsg || 'Could not detect location.' });
+        setLocation({ lat: 28.6139, lng: 77.2090, name: 'New Delhi (default)' });
         setLocating(false);
+        return;
+      }
+      const { latitude, longitude, accuracy } = pos.coords;
+      console.log(`GPS final accuracy: ${accuracy?.toFixed(1)}m after ${Date.now() - started}ms`);
+      if (accuracy && accuracy > 100) {
+        toast.warning('Low GPS accuracy', { description: `Position is accurate to ~${Math.round(accuracy)}m. Move outdoors and tap Refine for a better fix.` });
+      }
+      const name = await reverseGeocode(latitude, longitude);
+      setLocation({ lat: latitude, lng: longitude, name, accuracy });
+      setLocating(false);
+    };
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const acc = pos.coords.accuracy ?? Infinity;
+        if (!best || acc < (best.coords.accuracy ?? Infinity)) best = pos;
+        const elapsed = Date.now() - started;
+        if (acc <= GOOD_ACCURACY_M && elapsed >= MIN_WAIT_MS) {
+          finish(pos);
+        }
       },
       (err) => {
-        console.warn('Geolocation error:', err.message);
         const desc =
           err.code === err.PERMISSION_DENIED
             ? 'Location permission was denied. Please enable it in browser settings.'
@@ -105,12 +150,15 @@ export default function ReportFAB() {
             : err.code === err.TIMEOUT
             ? 'Location request timed out. Check your connection and try again.'
             : 'Could not detect location.';
-        toast.error('Location detection failed', { description: desc });
-        setLocation({ lat: 28.6139, lng: 77.2090, name: 'New Delhi (default)' });
-        setLocating(false);
+        finish(best, desc);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: MAX_WAIT_MS, maximumAge: 0 }
     );
+
+    // Hard timeout: return best sample collected so far
+    window.setTimeout(() => {
+      if (!settled) finish(best, best ? undefined : 'Timed out waiting for GPS.');
+    }, MAX_WAIT_MS);
   };
 
   const handleImageChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -271,11 +319,33 @@ export default function ReportFAB() {
                       <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted text-sm">
                         <MapPin className="h-4 w-4 text-primary shrink-0" />
                         {locating ? (
-                          <span className="text-muted-foreground flex items-center gap-2">
-                            <Loader2 className="h-3 w-3 animate-spin" /> Detecting location...
+                          <span className="text-muted-foreground flex items-center gap-2 flex-1">
+                            <Loader2 className="h-3 w-3 animate-spin" /> Getting precise location...
                           </span>
                         ) : (
-                          <span className="text-foreground truncate">{location?.name}</span>
+                          <>
+                            <span className="text-foreground truncate flex-1">{location?.name}</span>
+                            {location?.accuracy != null && (
+                              <span
+                                className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                                  location.accuracy <= 20
+                                    ? 'bg-solved/10 text-solved'
+                                    : location.accuracy <= 50
+                                    ? 'bg-primary/10 text-primary'
+                                    : 'bg-destructive/10 text-destructive'
+                                }`}
+                              >
+                                ±{Math.round(location.accuracy)}m
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={detectLocation}
+                              className="text-xs font-medium text-primary hover:underline shrink-0"
+                            >
+                              Refine
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
