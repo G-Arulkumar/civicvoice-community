@@ -65,41 +65,52 @@ export default function ReportFAB() {
 
   const detectLocation = () => {
     setLocating(true);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const { latitude, longitude, accuracy } = pos.coords;
-          console.log(`Location accuracy: ${accuracy}m`);
-          // Try reverse geocoding with high zoom for street-level detail
-          let name = 'Current Location';
-          try {
-            const res = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&zoom=18&addressdetails=1`,
-              { headers: { 'Accept-Language': 'en' } }
-            );
-            const data = await res.json();
-            if (data?.address) {
-              const { road, neighbourhood, suburb, city, town, village, state_district } = data.address;
-              const subLocality = suburb?.replace(/^Zone \d+\s*/i, '') || neighbourhood || road || '';
-              const locality = city || town || village || '';
-              const district = (state_district && state_district !== locality) ? state_district : '';
-              name = [subLocality, locality, district].filter(Boolean).join(', ') || name;
-            }
-          } catch { /* fallback to default name */ }
-          setLocation({ lat: latitude, lng: longitude, name });
-          setLocating(false);
-        },
-        (err) => {
-          console.warn('Geolocation error:', err.message);
-          setLocation({ lat: 28.6139, lng: 77.2090, name: 'New Delhi (default)' });
-          setLocating(false);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-      );
-    } else {
+    if (!navigator.geolocation) {
+      toast.error('Location not supported', { description: 'Your browser does not support GPS. Using a default location.' });
       setLocation({ lat: 28.6139, lng: 77.2090, name: 'New Delhi (default)' });
       setLocating(false);
+      return;
     }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude, accuracy } = pos.coords;
+        console.log(`Location accuracy: ${accuracy}m`);
+        let name = 'Current Location';
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&zoom=18&addressdetails=1`,
+            { headers: { 'Accept-Language': 'en' } }
+          );
+          const data = await res.json();
+          if (data?.address) {
+            const { road, neighbourhood, suburb, city, town, village, state_district } = data.address;
+            const subLocality = suburb?.replace(/^Zone \d+\s*/i, '') || neighbourhood || road || '';
+            const locality = city || town || village || '';
+            const district = (state_district && state_district !== locality) ? state_district : '';
+            name = [subLocality, locality, district].filter(Boolean).join(', ') || name;
+          }
+        } catch {
+          toast.warning('Address lookup failed', { description: 'Using raw coordinates.' });
+        }
+        setLocation({ lat: latitude, lng: longitude, name });
+        setLocating(false);
+      },
+      (err) => {
+        console.warn('Geolocation error:', err.message);
+        const desc =
+          err.code === err.PERMISSION_DENIED
+            ? 'Location permission was denied. Please enable it in browser settings.'
+            : err.code === err.POSITION_UNAVAILABLE
+            ? 'GPS signal unavailable. Try moving to an open area.'
+            : err.code === err.TIMEOUT
+            ? 'Location request timed out. Check your connection and try again.'
+            : 'Could not detect location.';
+        toast.error('Location detection failed', { description: desc });
+        setLocation({ lat: 28.6139, lng: 77.2090, name: 'New Delhi (default)' });
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
   };
 
   const handleImageChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
