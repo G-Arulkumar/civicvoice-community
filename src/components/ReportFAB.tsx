@@ -319,11 +319,33 @@ export default function ReportFAB() {
                       <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted text-sm">
                         <MapPin className="h-4 w-4 text-primary shrink-0" />
                         {locating ? (
-                          <span className="text-muted-foreground flex items-center gap-2">
-                            <Loader2 className="h-3 w-3 animate-spin" /> Detecting location...
+                          <span className="text-muted-foreground flex items-center gap-2 flex-1">
+                            <Loader2 className="h-3 w-3 animate-spin" /> Getting precise location...
                           </span>
                         ) : (
-                          <span className="text-foreground truncate">{location?.name}</span>
+                          <>
+                            <span className="text-foreground truncate flex-1">{location?.name}</span>
+                            {location?.accuracy != null && (
+                              <span
+                                className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                                  location.accuracy <= 20
+                                    ? 'bg-solved/10 text-solved'
+                                    : location.accuracy <= 50
+                                    ? 'bg-primary/10 text-primary'
+                                    : 'bg-destructive/10 text-destructive'
+                                }`}
+                              >
+                                ±{Math.round(location.accuracy)}m
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={detectLocation}
+                              className="text-xs font-medium text-primary hover:underline shrink-0"
+                            >
+                              Refine
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
