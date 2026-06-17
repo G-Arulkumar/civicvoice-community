@@ -1,6 +1,10 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { IssueType, IssueStatus, Issue } from '@/types/issue';
+
+class UploadError extends Error {}
+class DbError extends Error {}
 
 interface DbIssue {
   id: string;
