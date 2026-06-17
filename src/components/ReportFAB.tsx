@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Camera, MapPin, Loader2, Check, Users, AlertTriangle, ImagePlus } from 'lucide-react';
+import { Plus, X, Camera, MapPin, Loader2, Check, Users, AlertTriangle, ImagePlus, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useIssues } from '@/context/IssueContext';
 import { ISSUE_TYPES, IssueType } from '@/types/issue';
@@ -353,20 +353,17 @@ export default function ReportFAB() {
                     {/* Problem Type */}
                     <div>
                       <label className="text-sm font-semibold tracking-tight text-foreground mb-1.5 block">Problem Type</label>
-                      <div className="flex flex-wrap gap-2">
-                        {ISSUE_TYPES.map((t) => (
-                          <button
-                            key={t}
-                            onClick={() => setType(t)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                              type === t
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted text-muted-foreground hover:text-foreground'
-                            }`}
-                          >
-                            {t}
-                          </button>
-                        ))}
+                      <div className="relative">
+                        <select
+                          value={type}
+                          onChange={(e) => setType(e.target.value as IssueType)}
+                          className="w-full appearance-none px-3 py-2.5 pr-9 rounded-xl bg-muted text-sm text-foreground border-0 focus:ring-2 focus:ring-primary outline-none cursor-pointer"
+                        >
+                          {ISSUE_TYPES.map((t) => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                       </div>
                     </div>
 
