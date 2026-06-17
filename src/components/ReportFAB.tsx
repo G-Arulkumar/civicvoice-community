@@ -116,13 +116,25 @@ export default function ReportFAB() {
   const handleImageChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
-    // Compress before preview
-    const compressed = await compressImage(file);
-    setImageFile(compressed);
-    const reader = new FileReader();
-    reader.onloadend = () => setImagePreview(reader.result as string);
-    reader.readAsDataURL(compressed);
+    if (!file.type.startsWith('image/')) {
+      toast.error('Invalid file', { description: 'Please select an image file.' });
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error('Image too large', { description: 'Please choose a photo under 15 MB.' });
+      return;
+    }
+    try {
+      const compressed = await compressImage(file);
+      setImageFile(compressed);
+      const reader = new FileReader();
+      reader.onerror = () => toast.error('Could not read image', { description: 'Try a different photo.' });
+      reader.onloadend = () => setImagePreview(reader.result as string);
+      reader.readAsDataURL(compressed);
+    } catch (err: any) {
+      console.error('Image processing failed:', err);
+      toast.error('Could not process image', { description: err?.message || 'Try a different photo.' });
+    }
   }, []);
 
   const handleSubmit = async () => {
